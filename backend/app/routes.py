@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
@@ -15,19 +17,27 @@ def health() -> HealthResponse:
 
 
 @router.get("/cases", response_model=list[CaseResponse])
-def list_cases(connection: Connection = Depends(get_connection)) -> list[CaseResponse]:
-    rows = connection.execute(
-        text(
-            """
-            SELECT id, case_code, ST_Y(location) AS latitude,
-                   ST_X(location) AS longitude, status, waste_category,
-                   source, created_at
-            FROM dump_cases
-            ORDER BY created_at DESC
-            LIMIT 100
-            """
-        )
-    ).mappings()
+def list_cases(
+    status_filter: Literal[
+        "detected", "pending_verification", "verified", "rejected",
+        "needs_more_evidence", "cleanup_assigned", "cleaned", "closed", "duplicate",
+    ] | None = Query(default=None, alias="status"),
+    limit: int = Query(default=100, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    connection: Connection = Depends(get_connection),
+) -> list[CaseResponse]:
+    query = """
+        SELECT id, case_code, ST_Y(location::geometry) AS latitude,
+               ST_X(location::geometry) AS longitude, status, category AS waste_category,
+               source, created_at
+        FROM dump_cases
+    """
+    parameters: dict[str, object] = {"limit": limit, "offset": offset}
+    if status_filter:
+        query += " WHERE status = :status"
+        parameters["status"] = status_filter
+    query += " ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
+    rows = connection.execute(text(query), parameters).mappings()
     return [CaseResponse(**row) for row in rows]
 
 
@@ -37,10 +47,10 @@ def create_case(payload: CaseCreate, connection: Connection = Depends(get_connec
         row = connection.execute(
             text(
                 """
-                INSERT INTO dump_cases (location, status, waste_category, source)
-                VALUES (ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326), 'suspected', :waste_category, 'manual')
-                RETURNING id, case_code, ST_Y(location) AS latitude,
-                          ST_X(location) AS longitude, status, waste_category,
+                INSERT INTO dump_cases (location, status, category, source)
+                VALUES (ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326)::geography, 'detected', :waste_category, 'manual')
+                RETURNING id, case_code, ST_Y(location::geometry) AS latitude,
+                          ST_X(location::geometry) AS longitude, status, category AS waste_category,
                           source, created_at
                 """
             ),

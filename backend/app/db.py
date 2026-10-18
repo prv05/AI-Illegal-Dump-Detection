@@ -5,7 +5,7 @@ from sqlalchemy.engine import Connection, Engine
 
 from .config import get_settings
 
-engine: Engine = create_engine(get_settings().database_url, pool_pre_ping=True)
+engine: Engine = create_engine(get_settings().sqlalchemy_database_url, pool_pre_ping=True)
 
 
 def get_connection() -> Generator[Connection, None, None]:

@@ -85,6 +85,24 @@ npm run build
 
 Keep the backend and frontend running in separate PowerShell windows. Do not run `python main.py`: the application entry point is `backend\app\main.py` and it is served by Uvicorn.
 
+## Managed PostgreSQL
+
+For a managed PostgreSQL service such as Aiven, copy its connection URL into the local `.env` as `DATABASE_URL`. Never commit the real URL or paste it into chat.
+
+```dotenv
+DATABASE_URL=postgresql://<user>:<password>@<host>:<port>/<database>?sslmode=require
+VITE_API_BASE_URL=http://localhost:8000
+```
+
+The backend automatically converts `postgresql://` or `postgres://` schemes to the installed `psycopg` SQLAlchemy driver. Initialize the remote schema once from PowerShell using the provider URL:
+
+```powershell
+$env:DATABASE_URL = "postgresql://<user>:<password>@<host>:<port>/<database>?sslmode=require"
+psql $env:DATABASE_URL -f database\init.sql
+```
+
+The managed PostgreSQL instance must support the PostGIS extension because `dump_cases.location` is a PostGIS geography. If `database\init.sql` reports that `postgis` is unavailable, enable the extension in the provider or use a PostgreSQL provider that supports it before starting the backend.
+
 ## Database lifecycle
 
 Run `database/init.sql` once against the local database. It creates PostGIS and all eight foundation tables. The script is safe to rerun for its schema objects, but it does not migrate existing data. To reset local data, drop and recreate only the development database with PostgreSQL tools.

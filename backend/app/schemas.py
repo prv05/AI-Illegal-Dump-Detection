@@ -15,7 +15,17 @@ class CaseResponse(BaseModel):
     case_code: str
     latitude: float
     longitude: float
-    status: Literal["suspected", "confirmed", "rejected", "resolved"]
+    status: Literal[
+        "detected",
+        "pending_verification",
+        "verified",
+        "rejected",
+        "needs_more_evidence",
+        "cleanup_assigned",
+        "cleaned",
+        "closed",
+        "duplicate",
+    ]
     waste_category: str
     source: str
     created_at: datetime
