@@ -5,7 +5,9 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from .db import check_database, get_connection
+from .auth import get_current_user
 from .schemas import CaseCreate, CaseResponse, HealthResponse
+from .schemas import UserResponse
 
 router = APIRouter(prefix="/api/v1")
 
@@ -25,6 +27,7 @@ def list_cases(
     limit: int = Query(default=100, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     connection: Connection = Depends(get_connection),
+    current_user: UserResponse = Depends(get_current_user),
 ) -> list[CaseResponse]:
     query = """
         SELECT id, case_code, ST_Y(location::geometry) AS latitude,
@@ -42,7 +45,11 @@ def list_cases(
 
 
 @router.post("/cases", response_model=CaseResponse, status_code=status.HTTP_201_CREATED)
-def create_case(payload: CaseCreate, connection: Connection = Depends(get_connection)) -> CaseResponse:
+def create_case(
+    payload: CaseCreate,
+    connection: Connection = Depends(get_connection),
+    current_user: UserResponse = Depends(get_current_user),
+) -> CaseResponse:
     try:
         row = connection.execute(
             text(

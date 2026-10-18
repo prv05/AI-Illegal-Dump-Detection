@@ -118,6 +118,15 @@ CREATE TABLE IF NOT EXISTS cleanup_records (
     CHECK (completed_at IS NULL OR assigned_at IS NULL OR completed_at >= assigned_at)
 );
 
+CREATE TABLE IF NOT EXISTS auth_sessions (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 DROP TRIGGER IF EXISTS trg_users_updated_at ON users;
 CREATE TRIGGER trg_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 DROP TRIGGER IF EXISTS trg_dump_cases_updated_at ON dump_cases;
@@ -145,3 +154,5 @@ CREATE INDEX IF NOT EXISTS idx_inspections_case_id ON inspections (dump_case_id)
 CREATE INDEX IF NOT EXISTS idx_inspections_inspector_id ON inspections (inspector_id);
 CREATE INDEX IF NOT EXISTS idx_cleanup_records_case_id ON cleanup_records (dump_case_id);
 CREATE INDEX IF NOT EXISTS idx_cleanup_records_status ON cleanup_records (status);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_id ON auth_sessions (user_id);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires_at ON auth_sessions (expires_at);

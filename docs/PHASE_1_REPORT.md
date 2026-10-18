@@ -13,6 +13,8 @@ Date: 2026-10-18
 - Expanded the schema to cover users, private image/S3 metadata, detection runs, model detections, case evidence, inspection history, and cleanup attempts with audit-preserving foreign keys.
 - Added geography(Point, 4326) case locations, risk/severity/status constraints, JSONB metadata, update timestamp triggers, pagination/status filtering, and the complete workflow status model.
 - Updated the API to read and create cases against the expanded `category` and `detected` schema while preserving the frontend's `waste_category` field.
+- Added Argon2id signup/login/logout/current-user endpoints with HttpOnly cookie sessions and a non-destructive `auth_sessions` migration applied to Aiven.
+- Added React Router public auth pages, protected application routes, role-aware navigation, and honest placeholder pages for workflows without real backend endpoints.
 - Removed container-specific files so the project currently runs through native Windows services.
 - Added `.env.example`, `.gitignore`, Windows PowerShell setup instructions, and reset/volume guidance.
 
@@ -24,17 +26,21 @@ Date: 2026-10-18
 - `npm run build` from `frontend`: passed; Vite generated the production bundle.
 - Previous managed-database connection check: passed.
 - Previous provider `CREATE EXTENSION IF NOT EXISTS postgis`: failed because that provider reported `extension "postgis" is not available`.
+- `database/migrations/002_auth_sessions.sql` against Aiven: passed.
+- Auth smoke test against Aiven: signup, `/me`, logout, and login passed; new signup role was `uploader`.
+- Unauthenticated case request returned `401`.
+- Frontend build after auth routing: passed; Vite emitted a chunk-size warning due to Three.js.
 
 ## Runtime status
 
-The expanded schema and API compile successfully. Runtime schema initialization and database-backed endpoint tests require the configured managed database to provide PostGIS; `dump_cases.location` cannot be created without it. Run `psql $env:DATABASE_URL -f database\init.sql` after confirming the provider extension. The initial baseline did not contain a Git checkout, and the linked GitHub repository was confirmed empty, so no existing application code was overwritten.
+The expanded schema, Aiven migration, authentication API, and frontend build are working. The auth smoke test created a disposable `example.test` uploader account in Aiven. npm reported three high-severity advisories after adding React Router; no force-upgrade was applied. The initial baseline did not contain a Git checkout, and the linked GitHub repository was confirmed empty, so no existing application code was overwritten.
 
 ## Known issues and deferred work
 
 - The map is an explicitly labelled placeholder.
-- AI inference, satellite imagery, Street View, uploads, authentication, inspection, notifications, and cleanup operations are not implemented in Phase 1.
-- `database/init.sql` is an initial bootstrap script, not a migration system.
+- AI inference, satellite imagery, Street View, S3 uploads, password reset, inspection APIs, notifications, and cleanup APIs remain deferred.
+- `database/init.sql` is a clean bootstrap; `database/migrations/002_auth_sessions.sql` is the first non-destructive migration.
 
 ## Highest-priority Phase 2 task
 
-Add an authenticated image-ingestion and detection-run workflow, beginning with durable image asset metadata and a background job boundary before introducing a real model.
+Add the real detection-run and inspection APIs behind the protected page shells, beginning with durable image ingestion and a background job boundary before introducing a model.

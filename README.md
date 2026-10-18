@@ -4,9 +4,9 @@ Phase 1 provides a local foundation for tracking suspected illegal-waste locatio
 
 ## Phase 1 scope
 
-Implemented: health reporting, recent case listing, coordinate validation, suspected-case creation, readable case codes such as `DMP-000001`, PostGIS point storage, and a live dashboard connected to the API.
+Implemented: health reporting, cookie-based Argon2 authentication, protected case APIs, recent case listing, coordinate validation, detected-case creation, readable case codes such as `DMP-000001`, PostGIS point storage, and a live dashboard connected to the API.
 
-Not implemented yet: AI inference, satellite imagery ingestion, Google Maps or Street View, image uploads, authentication, municipal inspection, notifications, and cleanup workflows.
+Not implemented yet: AI inference, satellite imagery ingestion, Google Maps or Street View, S3 image uploads, password reset, municipal inspection APIs, notifications, and cleanup workflow APIs.
 
 ## Prerequisites
 
@@ -23,6 +23,8 @@ Run the native PostgreSQL, backend, and frontend setup below from this project r
 - Swagger API docs: http://localhost:8000/docs
 - Health: http://localhost:8000/api/v1/health
 - Cases: http://localhost:8000/api/v1/cases
+
+Authentication routes: `POST /api/v1/auth/signup`, `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, and `GET /api/v1/auth/me`. Sessions use an HttpOnly, SameSite cookie containing a random token whose SHA-256 hash is stored in `auth_sessions`; passwords use Argon2id hashes and are never returned.
 
 ## API smoke tests
 
@@ -70,6 +72,7 @@ python -m venv .venv
 pip install -r backend\requirements.txt
 $env:DATABASE_URL = "postgresql+psycopg://app_user:change_me_locally@localhost:5432/illegal_dump_detection"
 $env:CORS_ORIGINS = "http://localhost:5173"
+$env:SESSION_COOKIE_SECURE = "false"
 uvicorn app.main:app --app-dir backend --reload
 ```
 
@@ -91,7 +94,7 @@ For a managed PostgreSQL service such as Aiven, copy its connection URL into the
 
 ```dotenv
 DATABASE_URL=postgresql://<user>:<password>@<host>:<port>/<database>?sslmode=require
-VITE_API_BASE_URL=http://localhost:8000
+VITE_API_BASE_URL=http://127.0.0.1:8000
 ```
 
 The backend automatically converts `postgresql://` or `postgres://` schemes to the installed `psycopg` SQLAlchemy driver. Initialize the remote schema once from PowerShell using the provider URL:
@@ -102,6 +105,14 @@ psql $env:DATABASE_URL -f database\init.sql
 ```
 
 The managed PostgreSQL instance must support the PostGIS extension because `dump_cases.location` is a PostGIS geography. If `database\init.sql` reports that `postgis` is unavailable, enable the extension in the provider or use a PostgreSQL provider that supports it before starting the backend.
+
+For an existing database, apply the auth migration without dropping data:
+
+```powershell
+python -c "from pathlib import Path; import psycopg; from dotenv import dotenv_values; c=psycopg.connect(dotenv_values('.env')['DATABASE_URL']); c.execute(Path('database/migrations/002_auth_sessions.sql').read_text()); c.commit(); c.close()"
+```
+
+The migration creates only `auth_sessions`; it does not delete or recreate existing tables.
 
 ## Database lifecycle
 
