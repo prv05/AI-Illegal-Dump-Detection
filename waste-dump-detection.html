@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Illegal Waste Dump Detection</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EDF1F0; --surface:#FFFFFF; --surface-2:#F5F8F7; --ink:#12242A; --muted:#5B727B; --line:#D2DCDD;
+  --accent:#1D7C75; --accent-ink:#FFFFFF; --danger:#B8404B;
+  --map-bg:#0F1E24; --map-land:#132A31; --map-block:#1C3840; --map-road:#2C4850; --map-water:#1A3D52; --map-park:#17332B; --map-text:#8AA3AB; --map-line:#2A474F;
+  --c-construction:#D9A441; --c-biomedical:#E0457B; --c-chemical:#9B7BFF; --c-household:#3FB8AF; --c-ewaste:#5A9BF6; --c-plastic:#B5CF4A;
+  --radius-lg:18px; --radius-sm:8px;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0B1619; --surface:#11222A; --surface-2:#152A32; --ink:#E4ECEE; --muted:#8FA5AC; --line:#22393F;
+    --accent:#4CC3B8; --accent-ink:#06201D; --danger:#F07A85;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0B1619; --surface:#11222A; --surface-2:#152A32; --ink:#E4ECEE; --muted:#8FA5AC; --line:#22393F;
+  --accent:#4CC3B8; --accent-ink:#06201D; --danger:#F07A85;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px);scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.55 var(--body);-webkit-font-smoothing:antialiased}
+img{max-width:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ---------- Hero ---------- */
+.hero{position:relative;min-height:min(92vh,860px);background:var(--map-bg);color:#E7F0F1;overflow:hidden;display:flex;align-items:flex-end}
+.hero canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:pan-y}
+.hero canvas:active{cursor:grabbing}
+.hero::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,rgba(15,30,36,.92) 0%,rgba(15,30,36,.55) 42%,rgba(15,30,36,0) 70%),linear-gradient(0deg,rgba(15,30,36,.9) 0%,rgba(15,30,36,0) 35%)}
+.hero-copy{position:relative;z-index:2;padding:clamp(24px,5vw,64px);max-width:720px;pointer-events:none}
+.hero-copy > *{pointer-events:auto}
+.brand{display:flex;align-items:center;gap:10px;font:600 15px/1 var(--body);color:#A9C3C9;margin-bottom:28px}
+.brand svg{flex:none}
+.hero h1{font:800 clamp(40px,6.4vw,84px)/0.96 var(--display);letter-spacing:-0.025em;margin:0 0 20px;font-variation-settings:"opsz" 96}
+.hero p{font-size:clamp(16px,1.6vw,19px);color:#BCD0D5;max-width:52ch;margin:0 0 28px}
+.hero-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:8px;border:0;border-radius:999px;padding:12px 20px;font-weight:600;cursor:pointer;text-decoration:none;transition:transform .15s ease, background .15s ease}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:#4CC3B8;color:#06201D}
+.btn-primary:hover{background:#6ad3c9}
+.hint{font-size:14px;color:#86A0A7}
+.hero-methods{display:flex;gap:28px;margin-top:40px;flex-wrap:wrap}
+.method{display:flex;gap:12px;align-items:flex-start;max-width:260px}
+.method svg{flex:none;margin-top:2px}
+.method strong{display:block;font:700 17px/1.2 var(--display);color:#E7F0F1}
+.method span{font-size:14px;color:#9CB4BA;line-height:1.45}
+
+/* ---------- App ---------- */
+.app{max-width:1360px;margin:0 auto;padding:clamp(20px,4vw,48px) clamp(14px,3vw,32px) 64px}
+.app-head{display:flex;flex-wrap:wrap;gap:16px 24px;align-items:flex-end;justify-content:space-between;margin-bottom:20px}
+.app-head h2{font:700 clamp(26px,3vw,36px)/1.05 var(--display);letter-spacing:-0.015em;margin:0 0 6px}
+.app-head p{margin:0;color:var(--muted);max-width:60ch}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px}
+.tbtn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:9px 16px;font-weight:500;font-size:14px;cursor:pointer;display:inline-flex;gap:8px;align-items:center}
+.tbtn:hover{border-color:var(--accent)}
+.tbtn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.tbtn.solid{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.tbtn:disabled{opacity:.5;cursor:progress}
+
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:16px}
+.stat{background:var(--surface);padding:12px 16px;display:flex;align-items:baseline;gap:10px}
+.stat b{font:700 26px/1 var(--display)}
+.stat span{color:var(--muted);font-size:14px}
+
+.workspace{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(320px,1fr);gap:16px;align-items:start}
+@media (max-width:960px){.workspace{grid-template-columns:1fr}}
+
+.map-card{background:var(--map-bg);border-radius:var(--radius-lg);overflow:hidden;position:relative}
+.map-stage{position:relative;min-height:560px;padding:14px;overflow:hidden}
+#googleMap{width:100%;height:560px;border-radius:12px;box-shadow:0 30px 60px -30px rgba(0,0,0,.6)}
+.map-stage.tilted #googleMap{transform:rotateX(25deg) rotateZ(-3deg) scale(.96);transform-origin:50% 60%;transition:transform .7s cubic-bezier(.2,.8,.2,1)}
+.map-overlay{position:absolute;left:24px;top:24px;display:flex;gap:8px;flex-wrap:wrap;pointer-events:none}
+.pill{background:rgba(15,30,36,.78);backdrop-filter:blur(6px);color:#CFE0E3;border:1px solid var(--map-line);border-radius:999px;padding:6px 12px;font-size:13px}
+.legend{display:flex;flex-wrap:wrap;gap:8px;padding:4px 14px 16px}
+.chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--map-line);background:transparent;color:#CFE0E3;border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer}
+.chip i{width:10px;height:10px;border-radius:50%;background:var(--c)}
+.chip[aria-pressed="false"]{opacity:.4}
+.chip[aria-pressed="false"] i{background:transparent;border:1.5px solid var(--c)}
+.status-key{display:flex;gap:18px;flex-wrap:wrap;padding:0 14px 16px;color:var(--map-text);font-size:12.5px}
+.status-key span{display:inline-flex;gap:6px;align-items:center}
+
+.marker{cursor:pointer}
+.marker:focus{outline:none}
+.marker:focus-visible .hit{stroke:#fff;stroke-width:2}
+
+/* panel */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);overflow:hidden;position:sticky;top:calc(12px + env(safe-area-inset-top,0px))}
+@media (max-width:960px){.panel{position:static}}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--line)}
+.tab{border:0;background:transparent;padding:14px 8px 12px;cursor:pointer;text-align:left;border-bottom:3px solid transparent;display:flex;gap:10px;align-items:center;padding-left:16px}
+.tab .n{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font:700 13px/1 var(--display);border:1.5px solid var(--line);color:var(--muted)}
+.tab .t{font-weight:600;font-size:14px;line-height:1.2}
+.tab .t small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.tab[aria-selected="true"]{border-bottom-color:var(--accent)}
+.tab[aria-selected="true"] .n{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.panel-body{padding:18px;max-height:calc(100vh - 140px);overflow:auto}
+@media (max-width:960px){.panel-body{max-height:none}}
+.panel-intro{color:var(--muted);font-size:14px;margin:0 0 14px}
+.list{display:flex;flex-direction:column;gap:6px;margin-bottom:18px}
+.item{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:10px 12px;cursor:pointer}
+.item:hover{border-color:var(--accent)}
+.item[aria-current="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--c)}
+.dot.ring{background:transparent;border:2px dashed var(--c)}
+.item b{display:block;font-size:14px}
+.item small{color:var(--muted);font-size:12.5px}
+.conf{width:56px;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.conf i{display:block;height:100%;background:var(--accent)}
+.group-label{font-size:13px;color:var(--muted);margin:4px 0 8px;font-weight:600}
+.empty{border:1.5px dashed var(--line);border-radius:12px;padding:18px;color:var(--muted);font-size:14px;text-align:center}
+
+.detail{border-top:1px solid var(--line);padding-top:16px}
+.detail h3{font:700 22px/1.1 var(--display);margin:0 0 4px}
+.detail .sub{color:var(--muted);font-size:13.5px;margin:0 0 14px}
+.thumb{width:100%;aspect-ratio:16/10;border-radius:12px;display:block;background:var(--map-bg);margin-bottom:14px}
+dl.facts{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0 0 16px;font-size:14px}
+dl.facts dt{color:var(--muted)}
+dl.facts dd{margin:0;font-weight:500}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn-a{border:0;border-radius:10px;padding:11px 16px;font-weight:600;cursor:pointer;background:var(--accent);color:var(--accent-ink)}
+.btn-b{border:1px solid var(--line);border-radius:10px;padding:10px 16px;font-weight:600;cursor:pointer;background:transparent}
+.btn-b.warn{color:var(--danger)}
+
+.field{margin-bottom:14px}
+.field > label, .field > .lbl{display:block;font-weight:600;font-size:14px;margin-bottom:6px}
+.drop{display:grid;place-items:center;gap:6px;border:1.5px dashed var(--line);border-radius:12px;padding:18px;text-align:center;cursor:pointer;color:var(--muted);font-size:14px;background:var(--surface-2)}
+.drop:hover{border-color:var(--accent)}
+.drop img{border-radius:8px;max-height:180px;object-fit:cover;width:100%}
+.drop input{position:absolute;opacity:0;width:1px;height:1px}
+select,textarea{width:100%;border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:10px 12px}
+textarea{min-height:70px;resize:vertical}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg label{text-align:center;padding:9px;cursor:pointer;font-size:14px;border-right:1px solid var(--line)}
+.seg label:last-child{border-right:0}
+.seg input{position:absolute;opacity:0}
+.seg input:checked + span{font-weight:700;color:var(--accent)}
+.seg label:has(input:checked){background:var(--surface-2)}
+.seg label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:-2px}
+
+.letter{border:1px solid var(--line);border-radius:12px;padding:16px;background:var(--surface-2);font-size:14px;margin-bottom:14px}
+.letter .to{color:var(--muted);margin-bottom:10px}
+.letter .subj{font-weight:600;margin-bottom:10px}
+.letter img{border-radius:8px;margin-top:10px;max-height:150px;object-fit:cover;width:100%}
+.tag{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:12.5px;font-weight:600;background:color-mix(in srgb,var(--c) 18%,transparent);color:var(--ink)}
+.tag::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--c)}
+.ticket{border-radius:12px;padding:14px 16px;background:color-mix(in srgb,var(--accent) 12%,transparent);margin-bottom:14px;font-size:14px}
+.ticket b{font:700 20px/1.1 var(--display);display:block;margin-bottom:2px}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:12px;font-size:14px;font-weight:500;transition:.25s ease;z-index:50;pointer-events:none;max-width:90vw}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+footer{text-align:center;color:var(--muted);font-size:13px;padding:0 16px 32px}
+
+@media (prefers-reduced-motion: reduce){
+  *{transition:none !important;scroll-behavior:auto !important}
+}
+</style>
+</head>
+<body>
+
+<header class="hero" id="top">
+  <canvas id="scene" aria-label="3D scene: a satellite scanning a city block and highlighting waste dumps"></canvas>
+  <div class="hero-copy">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4CC3B8" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><circle cx="12" cy="12" r="2" fill="#4CC3B8"/></svg>
+      WasteWatch GIS
+    </div>
+    <h1>Illegal Waste Dump Detection</h1>
+    <p>Satellite imagery flags suspected dump sites. A street check confirms each one with a photo. Confirmed sites go to the municipal corporation, mapped by waste category.</p>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="#map">Open the map</a>
+      <span class="hint">Drag the scene to rotate it</span>
+    </div>
+    <div class="hero-methods">
+      <div class="method">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#4CC3B8" stroke-width="1.8"><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M3 7h5v10H3zM16 7h5v10h-5z"/><path d="M12 15v6" stroke-dasharray="2 2"/></svg>
+        <div><strong>Satellite view</strong><span>Finds candidate dumps from above and places them on the GIS map.</span></div>
+      </div>
+      <div class="method">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#4CC3B8" stroke-width="1.8"><rect x="3" y="6" width="18" height="13" rx="2"/><circle cx="12" cy="12.5" r="3.5"/><path d="M8 6l1.5-2h5L16 6"/></svg>
+        <div><strong>Street view</strong><span>Field teams verify on the ground, pick the category and report it.</span></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="app" id="map">
+  <div class="app-head">
+    <div>
+      <h2>City dump map</h2>
+      <p>Pick a site on the map or in the panel. Work it through scan, street check and report.</p>
+    </div>
+    <div class="toolbar">
+      <button class="tbtn solid" id="scanBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 15-6.7M21 12a9 9 0 0 1-15 6.7"/><path d="M18 2v4h-4M6 22v-4h4"/></svg>
+        Run satellite scan
+      </button>
+      <button class="tbtn" id="tiltBtn" aria-pressed="false">3D tilt</button>
+      <button class="tbtn" id="resetBtn">Reset demo</button>
+    </div>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="workspace">
+    <section class="map-card" aria-label="GIS map">
+      <div class="map-stage" id="stage">
+        <div id="googleMap" role="application" aria-label="Google map showing suspected waste dump sites"></div>
+      </div>
+      <div class="map-overlay"><span class="pill" id="coordPill">Hover the map for coordinates</span></div>
+      <div class="legend" id="legend" aria-label="Filter by waste category"></div>
+      <div class="status-key">
+        <span><svg width="16" height="16"><circle cx="8" cy="8" r="6" fill="none" stroke="#8AA3AB" stroke-width="2" stroke-dasharray="3 2"/></svg>Flagged by satellite</span>
+        <span><svg width="16" height="16"><circle cx="8" cy="8" r="6" fill="#8AA3AB" stroke="#fff" stroke-width="1.5"/></svg>Street verified</span>
+        <span><svg width="16" height="16"><circle cx="8" cy="8" r="4.5" fill="#8AA3AB"/><circle cx="8" cy="8" r="7" fill="none" stroke="#8AA3AB" stroke-width="1.5"/></svg>Reported to corporation</span>
+      </div>
+    </section>
+
+    <aside class="panel" aria-label="Workflow">
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" data-tab="sat"><span class="n">1</span><span class="t">Satellite<small>Flagged sites</small></span></button>
+        <button class="tab" role="tab" data-tab="street"><span class="n">2</span><span class="t">Street check<small>Verify on site</small></span></button>
+        <button class="tab" role="tab" data-tab="report"><span class="n">3</span><span class="t">Report<small>To corporation</small></span></button>
+      </div>
+      <div class="panel-body" id="panel"></div>
+    </aside>
+  </div>
+</main>
+
+<footer>Frontend demo with sample data. Satellite detections and coordinates are simulated.</footer>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCVmvdeAcSZ7MFCKHqwBXSx5dFi3WPn9-8&callback=initGoogleMap" async defer></script>
+<script>
+/* ================= Data ================= */
+const CATS = {
+  construction:{name:"Construction debris", var:"--c-construction", hex:"#D9A441"},
+  biomedical:{name:"Biomedical", var:"--c-biomedical", hex:"#E0457B"},
+  chemical:{name:"Chemical / industrial", var:"--c-chemical", hex:"#9B7BFF"},
+  household:{name:"Household mixed", var:"--c-household", hex:"#3FB8AF"},
+  ewaste:{name:"E-waste", var:"--c-ewaste", hex:"#5A9BF6"},
+  plastic:{name:"Plastic", var:"--c-plastic", hex:"#B5CF4A"}
+};
+const SEED_SITES = [
+  {id:"D-101",x:210,y:150,ai:"construction",conf:.93,area:420,seen:"2026-09-02",status:"reported",cat:"construction",severity:"High",ticket:"MC-2026-0131",sent:"2026-09-05",notes:"Truckloads of rubble along the road edge."},
+  {id:"D-102",x:640,y:120,ai:"household",conf:.81,area:250,seen:"2026-09-06",status:"verified",cat:"household",severity:"Medium",notes:"Mixed bags behind the bus depot."},
+  {id:"D-103",x:830,y:230,ai:"chemical",conf:.88,area:180,seen:"2026-09-10",status:"detected"},
+  {id:"D-104",x:120,y:300,ai:"plastic",conf:.74,area:150,seen:"2026-09-11",status:"detected"},
+  {id:"D-105",x:450,y:250,ai:"construction",conf:.90,area:610,seen:"2026-09-12",status:"detected"},
+  {id:"D-106",x:300,y:545,ai:"biomedical",conf:.86,area:90,seen:"2026-09-08",status:"verified",cat:"biomedical",severity:"High",notes:"Syringes and IV bags near the canal."},
+  {id:"D-107",x:700,y:525,ai:"ewaste",conf:.79,area:120,seen:"2026-09-13",status:"detected"},
+  {id:"D-108",x:905,y:560,ai:"household",conf:.68,area:300,seen:"2026-08-29",status:"reported",cat:"household",severity:"Low",ticket:"MC-2026-0127",sent:"2026-09-01"},
+  {id:"D-109",x:575,y:320,ai:"chemical",conf:.72,area:140,seen:"2026-09-14",status:"detected"},
+  {id:"D-110",x:385,y:95,ai:"plastic",conf:.58,area:110,seen:"2026-09-15",status:"detected"}
+];
+const SCAN_POOL = [
+  {id:"D-111",x:160,y:470,ai:"construction",conf:.84,area:380},
+  {id:"D-112",x:775,y:395,ai:"biomedical",conf:.77,area:70},
+  {id:"D-113",x:525,y:590,ai:"plastic",conf:.70,area:200},
+  {id:"D-114",x:870,y:75,ai:"ewaste",conf:.66,area:95}
+];
+const KEY = "wastewatch-v1";
+let state = load() || fresh();
+function fresh(){ return {sites:JSON.parse(JSON.stringify(SEED_SITES)), pool:JSON.parse(JSON.stringify(SCAN_POOL)), tab:"sat", sel:null, filters:Object.keys(CATS), ticketNo:142}; }
+function load(){ try{ const s = localStorage.getItem(KEY); return s ? JSON.parse(s) : null; }catch(e){ return null; } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const ward = (x,y) => y < 320 ? (x < 500 ? "Ward 12, North-West" : "Ward 14, North-East") : (x < 500 ? "Ward 21, South-West" : "Ward 23, South-East");
+const lat = y => (12.90 + (640 - y) / 640 * 0.12).toFixed(5);
+const lng = x => (77.50 + x / 1000 * 0.16).toFixed(5);
+const coords = s => `${lat(s.y)}° N, ${lng(s.x)}° E`;
+const catOf = s => s.cat || s.ai;
+const cvar = k => `var(${CATS[k].var})`;
+const byId = id => state.sites.find(s => s.id === id);
+const today = () => new Date().toISOString().slice(0,10);
+let googleMap = null;
+let googleMarkers = new Map();
+const mapCenter = {lat:12.96, lng:77.58};
+const sitePosition = s => ({lat:Number(lat(s.y)), lng:Number(lng(s.x))});
+
+function markerIcon(site, selected){
+  const color = CATS[catOf(site)].hex;
+  const size = selected ? 14 : site.status === "reported" ? 12 : 10;
+  const ring = site.status === "detected" ? `stroke-dasharray="4 3"` : `stroke="#FFFFFF" stroke-width="2"`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${selected ? 44 : 36}" height="${selected ? 44 : 36}" viewBox="0 0 36 36"><circle cx="18" cy="18" r="${selected ? 16 : 13}" fill="${site.status === "detected" ? "#10242A" : color}" fill-opacity="${site.status === "detected" ? ".9" : "1"}" stroke="${selected ? "#FFFFFF" : color}" stroke-width="${selected ? 3 : 2}" ${ring}/><circle cx="18" cy="18" r="${size / 3}" fill="${color}"/><text x="18" y="34" text-anchor="middle" font-family="Arial" font-size="9" font-weight="700" fill="#FFFFFF">${site.id}</text></svg>`;
+  return {url:`data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`, scaledSize:new google.maps.Size(selected ? 44 : 36, selected ? 44 : 36), anchor:new google.maps.Point(selected ? 22 : 18, selected ? 22 : 18)};
+}
+
+function initGoogleMap(){
+  const el = $("#googleMap");
+  if(!el || !window.google?.maps) return;
+  googleMap = new google.maps.Map(el, {center:mapCenter, zoom:13, mapTypeControl:true, streetViewControl:true, fullscreenControl:true, styles:[{featureType:"poi",stylers:[{visibility:"off"}]}]});
+  google.maps.event.addListener(googleMap, "mousemove", e => { if(e.latLng) $("#coordPill").textContent = `${e.latLng.lat().toFixed(5)}° N, ${e.latLng.lng().toFixed(5)}° E`; });
+  renderMarkers();
+}
+window.gm_authFailure = () => { $("#coordPill").textContent = "Add a valid Google Maps API key to load the map"; };
+
+/* ================= Base map ================= */
+function rng(seed){ return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+function drawBase(){
+  const r = rng(42), g = [];
+  const S = "http://www.w3.org/2000/svg";
+  g.push(`<rect width="1000" height="640" fill="var(--map-land)"/>`);
+  // city blocks (satellite-like texture)
+  for(let bx=0; bx<1000; bx+=62) for(let by=0; by<640; by+=58){
+    const riverY = 430 - 40*Math.sin(bx/160);
+    if(Math.abs(by+29 - riverY) < 48) continue;
+    for(let k=0;k<3;k++){
+      if(r() < .3) continue;
+      const w = 10 + r()*20, h = 8 + r()*18;
+      g.push(`<rect x="${(bx+6+r()*(46-w)).toFixed(1)}" y="${(by+6+r()*(42-h)).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="var(--map-block)" opacity="${(.55+r()*.45).toFixed(2)}"/>`);
+    }
+  }
+  // parks
+  g.push(`<rect x="720" y="150" width="120" height="80" rx="10" fill="var(--map-park)"/><rect x="60" y="80" width="100" height="70" rx="10" fill="var(--map-park)"/><ellipse cx="620" cy="560" rx="70" ry="38" fill="var(--map-water)" opacity=".9"/>`);
+  // river
+  let d = "M -20 ";
+  for(let x=-20; x<=1020; x+=20){ const y = 430 - 40*Math.sin(x/160); d += (x===-20? "" : " L ") + x + " " + y.toFixed(1); }
+  g.push(`<path d="${d}" fill="none" stroke="var(--map-water)" stroke-width="34" stroke-linecap="round"/>`);
+  // roads
+  const major = [[0,320,1000,320],[500,0,500,640],[0,110,1000,190],[250,0,300,640],[760,0,720,640]];
+  major.forEach(([a,b,c,e]) => g.push(`<line x1="${a}" y1="${b}" x2="${c}" y2="${e}" stroke="var(--map-road)" stroke-width="7" stroke-linecap="round"/>`));
+  for(let x=62; x<1000; x+=124) g.push(`<line x1="${x}" y1="0" x2="${x}" y2="640" stroke="var(--map-road)" stroke-width="1.6" opacity=".6"/>`);
+  for(let y=58; y<640; y+=116) g.push(`<line x1="0" y1="${y}" x2="1000" y2="${y}" stroke="var(--map-road)" stroke-width="1.6" opacity=".6"/>`);
+  // ward boundaries + labels
+  g.push(`<path d="M500 0V640M0 320H1000" stroke="#4CC3B8" stroke-width="1.2" stroke-dasharray="6 6" opacity=".45" fill="none"/>`);
+  [["Ward 12",20,300],["Ward 14",520,300],["Ward 21",20,620],["Ward 23",520,620]].forEach(([t,x,y]) =>
+    g.push(`<text x="${x}" y="${y}" fill="var(--map-text)" font-family="IBM Plex Sans, sans-serif" font-size="14" font-weight="600" opacity=".75">${t}</text>`));
+  // north arrow + scale
+  g.push(`<g transform="translate(958 40)" fill="none" stroke="var(--map-text)" stroke-width="1.5"><circle r="16"/><path d="M0 -11 L5 5 L0 1 L-5 5 Z" fill="var(--map-text)"/></g>
+          <g transform="translate(830 612)" stroke="var(--map-text)" stroke-width="2"><line x1="0" y1="0" x2="120" y2="0"/><line x1="0" y1="-5" x2="0" y2="5"/><line x1="120" y1="-5" x2="120" y2="5"/></g>
+          <text x="890" y="600" text-anchor="middle" fill="var(--map-text)" font-family="IBM Plex Sans, sans-serif" font-size="12">1 km</text>`);
+  $("#base").innerHTML = g.join("");
+}
+
+/* ================= Markers ================= */
+function renderMarkers(){
+  if(!googleMap) return;
+  googleMarkers.forEach(marker => marker.setMap(null));
+  googleMarkers = new Map();
+  state.sites.forEach(s => {
+    if(s.status === "rejected") return;
+    const k = catOf(s);
+    if(!state.filters.includes(k)) return;
+    const marker = new google.maps.Marker({map:googleMap, position:sitePosition(s), title:`${s.id} - ${CATS[k].name}`, icon:markerIcon(s, s.id === state.sel), optimized:false});
+    marker.addListener("click", () => select(s.id));
+    googleMarkers.set(s.id, marker);
+  });
+  const selected = byId(state.sel);
+  if(selected && googleMarkers.has(selected.id)) googleMap.panTo(sitePosition(selected));
+}
+
+/* ================= Legend / stats ================= */
+function renderLegend(){
+  $("#legend").innerHTML = Object.entries(CATS).map(([k,c]) =>
+    `<button class="chip" data-cat="${k}" aria-pressed="${state.filters.includes(k)}" style="--c:${cvar(k)}"><i></i>${c.name}</button>`).join("");
+}
+function renderStats(){
+  const n = st => state.sites.filter(s => s.status === st).length;
+  $("#stats").innerHTML = [["detected","Flagged"],["verified","Verified"],["reported","Reported"],["rejected","False alarms"]]
+    .map(([k,l]) => `<div class="stat"><b>${n(k)}</b><span>${l}</span></div>`).join("");
+}
+
+/* ================= Panel ================= */
+function listItem(s, showConf){
+  const k = catOf(s);
+  return `<button class="item" data-pick="${s.id}" aria-current="${s.id===state.sel}" style="--c:${cvar(k)}">
+    <span class="dot ${s.status==="detected"?"ring":""}"></span>
+    <span><b>${s.id} <span style="font-weight:400;color:var(--muted)">${ward(s.x,s.y).split(",")[0]}</span></b>
+    <small>${s.status==="detected" ? "AI guess: " : ""}${CATS[k].name}${s.ticket ? ", " + s.ticket : ""}</small></span>
+    ${showConf ? `<span class="conf" title="${Math.round(s.conf*100)}% confidence"><i style="width:${s.conf*100}%"></i></span>` : `<span></span>`}
+  </button>`;
+}
+function renderPanel(){
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.tab === state.tab));
+  const sel = byId(state.sel);
+  const detected = state.sites.filter(s => s.status==="detected").sort((a,b) => b.conf - a.conf);
+  let h = "";
+
+  if(state.tab === "sat"){
+    h += `<p class="panel-intro">Sites the satellite model flagged. Sorted by confidence. Pick one to see the image tile.</p>`;
+    h += detected.length ? `<div class="list">${detected.map(s => listItem(s,true)).join("")}</div>`
+                         : `<div class="empty">No flagged sites left. Run a satellite scan to look for new ones.</div>`;
+    if(sel && sel.status==="detected"){
+      h += `<div class="detail">
+        <h3>${sel.id}</h3><p class="sub">${ward(sel.x,sel.y)}</p>
+        <canvas class="thumb" id="thumb" width="480" height="300" aria-label="Satellite tile of ${sel.id}"></canvas>
+        <dl class="facts">
+          <dt>AI guess</dt><dd><span class="tag" style="--c:${cvar(sel.ai)}">${CATS[sel.ai].name}</span></dd>
+          <dt>Confidence</dt><dd>${Math.round(sel.conf*100)}%</dd>
+          <dt>Est. area</dt><dd>${sel.area} m²</dd>
+          <dt>Coordinates</dt><dd>${coords(sel)}</dd>
+          <dt>First seen</dt><dd>${sel.seen}</dd>
+        </dl>
+        <div class="actions"><button class="btn-a" data-go="street">Verify on street</button></div>
+      </div>`;
+    }
+  }
+
+  if(state.tab === "street"){
+    h += `<p class="panel-intro">Visit a flagged site, take a photo and confirm what's there.</p>`;
+    h += detected.length ? `<div class="list">${detected.map(s => listItem(s,false)).join("")}</div>`
+                         : `<div class="empty">Nothing waiting for a street check.</div>`;
+    if(sel && sel.status==="detected"){
+      const sevs = ["Low","Medium","High"];
+      h += `<div class="detail">
+        <h3>${sel.id}</h3><p class="sub">${ward(sel.x,sel.y)}. ${coords(sel)}</p>
+        <div class="field"><span class="lbl">Street photo</span>
+          <label class="drop" id="drop">
+            ${sel.photo ? `<img src="${sel.photo}" alt="Street photo of ${sel.id}">` : `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="6" width="18" height="13" rx="2"/><circle cx="12" cy="12.5" r="3.5"/></svg>`}
+            <span>${sel.photo ? "Replace photo" : "Take or upload a photo"}</span>
+            <input type="file" accept="image/*" capture="environment" id="photoIn">
+          </label>
+        </div>
+        <div class="field"><label for="catSel">Waste category</label>
+          <select id="catSel">${Object.entries(CATS).map(([k,c]) => `<option value="${k}" ${k===(sel.draftCat||sel.ai)?"selected":""}>${c.name}</option>`).join("")}</select>
+        </div>
+        <div class="field"><span class="lbl">Severity</span>
+          <div class="seg">${sevs.map(v => `<label><input type="radio" name="sev" value="${v}" ${v===(sel.draftSev||"Medium")?"checked":""}><span>${v}</span></label>`).join("")}</div>
+        </div>
+        <div class="field"><label for="notes">Notes</label><textarea id="notes" placeholder="What you saw, access, landmarks">${esc(sel.notes)}</textarea></div>
+        <div class="actions">
+          <button class="btn-a" data-act="confirm">Confirm dump</button>
+          <button class="btn-b warn" data-act="reject">Not a dump</button>
+        </div>
+      </div>`;
+    }
+  }
+
+  if(state.tab === "report"){
+    const ready = state.sites.filter(s => s.status==="verified");
+    const sent = state.sites.filter(s => s.status==="reported");
+    h += `<p class="panel-intro">Verified sites are sent to the municipal corporation's solid waste department.</p>`;
+    h += `<div class="group-label">Ready to send (${ready.length})</div>`;
+    h += ready.length ? `<div class="list">${ready.map(s => listItem(s,false)).join("")}</div>` : `<div class="empty" style="margin-bottom:18px">Confirm a site in the street check to report it.</div>`;
+    h += `<div class="group-label">Sent (${sent.length})</div>`;
+    h += sent.length ? `<div class="list">${sent.map(s => listItem(s,false)).join("")}</div>` : `<div class="empty">No reports sent yet.</div>`;
+    if(sel && (sel.status==="verified" || sel.status==="reported")){
+      const k = catOf(sel);
+      h += `<div class="detail">`;
+      if(sel.status==="reported"){
+        h += `<div class="ticket"><b>${sel.ticket}</b>Sent on ${sel.sent}. Received by the solid waste department.</div>`;
+      }
+      h += `<div class="letter">
+          <div class="to">To: Municipal Corporation, Solid Waste Management Dept.</div>
+          <div class="subj">Illegal dump at ${ward(sel.x,sel.y)}</div>
+          <dl class="facts" style="margin:0">
+            <dt>Site</dt><dd>${sel.id}</dd>
+            <dt>Category</dt><dd><span class="tag" style="--c:${cvar(k)}">${CATS[k].name}</span></dd>
+            <dt>Severity</dt><dd>${sel.severity || "Medium"}</dd>
+            <dt>Area</dt><dd>about ${sel.area} m²</dd>
+            <dt>Location</dt><dd>${coords(sel)}</dd>
+            ${sel.notes ? `<dt>Notes</dt><dd>${esc(sel.notes)}</dd>` : ""}
+          </dl>
+          ${sel.photo ? `<img src="${sel.photo}" alt="Street photo">` : ""}
+        </div>`;
+      if(sel.status==="verified") h += `<div class="actions"><button class="btn-a" data-act="send">Send to corporation</button></div>`;
+      h += `</div>`;
+    }
+  }
+  $("#panel").innerHTML = h;
+  if($("#thumb")) drawThumb($("#thumb"), sel);
+}
+
+/* Procedural satellite tile */
+function drawThumb(cv, s){
+  const x = cv.getContext("2d"), W = cv.width, H = cv.height;
+  const r = rng(parseInt(s.id.slice(2)) * 97 + 13);
+  x.fillStyle = "#1A2F33"; x.fillRect(0,0,W,H);
+  for(let i=0;i<1400;i++){ x.fillStyle = `rgba(${120+r()*60},${130+r()*50},${110+r()*40},${r()*.08})`; x.fillRect(r()*W, r()*H, 3, 3); }
+  x.fillStyle = "#3B4F52"; x.fillRect(0, H*.62, W, 18); x.fillRect(W*.7, 0, 16, H);
+  for(let i=0;i<22;i++){ const w=20+r()*40, h=16+r()*30; const px=r()*W, py=r()*H;
+    if(Math.abs(px-W*.4)<90 && Math.abs(py-H*.38)<70) continue;
+    x.fillStyle = `hsl(${190+r()*20} 12% ${22+r()*18}%)`; x.fillRect(px,py,w,h); }
+  const cx = W*.4, cy = H*.38, col = CATS[s.ai].hex;
+  x.beginPath();
+  for(let a=0;a<=Math.PI*2+.01;a+=.3){ const rr = 38 + r()*22; x.lineTo(cx+Math.cos(a)*rr*1.3, cy+Math.sin(a)*rr); }
+  x.closePath(); x.fillStyle = col + "88"; x.fill();
+  for(let i=0;i<120;i++){ const a=r()*6.28, d=r()*44; x.fillStyle = r()<.5 ? col : "#d8d2c4"; x.fillRect(cx+Math.cos(a)*d*1.3, cy+Math.sin(a)*d, 2+r()*3, 2+r()*3); }
+  x.strokeStyle = "#9AF0E7"; x.lineWidth = 2; x.setLineDash([6,4]); x.strokeRect(cx-82, cy-68, 164, 136); x.setLineDash([]);
+  x.fillStyle = "#9AF0E7"; x.fillRect(cx-82, cy-90, 150, 22);
+  x.fillStyle = "#06201D"; x.font = "600 13px IBM Plex Sans, sans-serif"; x.fillText(`${s.id}  ${Math.round(s.conf*100)}% dump`, cx-76, cy-74);
+}
+
+/* ================= Actions ================= */
+function renderAll(){ renderStats(); renderLegend(); renderMarkers(); renderPanel(); save(); }
+function select(id, tab){
+  state.sel = id;
+  const s = byId(id);
+  if(tab) state.tab = tab;
+  else if(s) state.tab = s.status==="detected" ? (state.tab==="street" ? "street" : "sat") : "report";
+  renderMarkers(); renderPanel(); save();
+}
+let toastT;
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),2600); }
+
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => { state.tab = t.dataset.tab; renderPanel(); save(); }));
+$("#legend").addEventListener("click", e => {
+  const b = e.target.closest(".chip"); if(!b) return;
+  const k = b.dataset.cat;
+  state.filters = state.filters.includes(k) ? state.filters.filter(f => f!==k) : [...state.filters, k];
+  renderLegend(); renderMarkers(); save();
+});
+$("#panel").addEventListener("click", e => {
+  const pick = e.target.closest("[data-pick]"); if(pick) return select(pick.dataset.pick, state.tab);
+  const go = e.target.closest("[data-go]"); if(go){ state.tab = go.dataset.go; renderPanel(); save(); return; }
+  const act = e.target.closest("[data-act]"); if(!act) return;
+  const s = byId(state.sel); if(!s) return;
+  if(act.dataset.act === "confirm"){
+    s.cat = $("#catSel").value; s.severity = (document.querySelector('input[name="sev"]:checked')||{}).value || "Medium";
+    s.notes = $("#notes").value.trim(); s.status = "verified"; s.verified = today();
+    state.tab = "report"; toast(`${s.id} confirmed as ${CATS[s.cat].name.toLowerCase()}. Ready to report.`);
+  }
+  if(act.dataset.act === "reject"){ s.status = "rejected"; state.sel = null; toast(`${s.id} marked as a false alarm and removed from the map.`); }
+  if(act.dataset.act === "send"){
+    s.status = "reported"; s.ticket = `MC-2026-${String(state.ticketNo++).padStart(4,"0")}`; s.sent = today();
+    toast(`Report sent to the corporation. Ticket ${s.ticket}.`);
+  }
+  renderAll();
+});
+$("#panel").addEventListener("change", e => {
+  const s = byId(state.sel); if(!s) return;
+  if(e.target.id === "catSel") s.draftCat = e.target.value;
+  if(e.target.name === "sev") s.draftSev = e.target.value;
+  if(e.target.id === "photoIn" && e.target.files[0]){
+    const f = e.target.files[0], rd = new FileReader();
+    rd.onload = () => { const img = new Image(); img.onload = () => {
+      const sc = Math.min(1, 640 / img.width), c = document.createElement("canvas");
+      c.width = img.width*sc; c.height = img.height*sc; c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+      s.notes = $("#notes") ? $("#notes").value : s.notes;
+      s.photo = c.toDataURL("image/jpeg", .75); renderPanel(); save();
+    }; img.src = rd.result; };
+    rd.readAsDataURL(f);
+  }
+});
+$("#panel").addEventListener("input", e => { if(e.target.id==="notes"){ const s=byId(state.sel); if(s) s.notes=e.target.value; } });
+
+$("#tiltBtn").addEventListener("click", e => {
+  const on = e.currentTarget.getAttribute("aria-pressed") !== "true";
+  e.currentTarget.setAttribute("aria-pressed", on); $("#stage").classList.toggle("tilted", on);
+});
+$("#resetBtn").addEventListener("click", () => { state = fresh(); renderAll(); toast("Demo data restored."); });
+$("#scanBtn").addEventListener("click", () => {
+  const btn = $("#scanBtn");
+  if(!state.pool.length){ toast("Scan finished. No new candidate sites in this area."); return; }
+  btn.disabled = true;
+  const dur = reduced ? 1 : 2200, t0 = performance.now();
+  const step = now => {
+    const p = Math.min(1, (now - t0) / dur);
+    const x = p * 1000;
+    state.pool = state.pool.filter(s => {
+      if(s.x < x){ state.sites.push({...s, status:"detected", seen:today()}); state.found = (state.found||0) + 1; renderMarkers(); renderStats(); return false; }
+      return true;
+    });
+    if(p < 1) requestAnimationFrame(step);
+    else {
+      btn.disabled = false;
+      const n = state.found || 0; state.found = 0; state.tab = "sat"; renderAll();
+      toast(n ? `${n} new candidate site${n>1?"s":""} flagged. Check them on the street.` : "Scan finished. No new sites.");
+    }
+  };
+  requestAnimationFrame(step);
+});
+
+renderAll();
+
+/* ================= 3D hero scene ================= */
+(function initScene(){
+  if(!window.THREE) return;
+  const canvas = $("#scene");
+  let renderer;
+  try{ renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true}); }catch(e){ return; }
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x0f1e24, 28, 58);
+  const camera = new THREE.PerspectiveCamera(36, 1, .1, 200);
+  scene.add(new THREE.AmbientLight(0xbfd6dc, .55));
+  const sun = new THREE.DirectionalLight(0xffffff, .85); sun.position.set(8,16,6); scene.add(sun);
+
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(28,28), new THREE.MeshStandardMaterial({color:0x132a31, roughness:1}));
+  ground.rotation.x = -Math.PI/2; scene.add(ground);
+  const grid = new THREE.GridHelper(28, 28, 0x2a4a52, 0x1b343b); grid.position.y = .01; scene.add(grid);
+  const river = new THREE.Mesh(new THREE.PlaneGeometry(28,1.5), new THREE.MeshStandardMaterial({color:0x1a4b66, roughness:.25, metalness:.3}));
+  river.rotation.x = -Math.PI/2; river.position.set(0,.02,2.5); scene.add(river);
+
+  const DUMPS = [[-4,-5,"construction"],[1,-4,"chemical"],[4,-1,"household"],[-5,1,"biomedical"],[5,5,"ewaste"],[-2,5,"plastic"]];
+  const taken = new Set(DUMPS.map(d => d[0]+","+d[1]));
+  const r = rng(7), box = new THREE.BoxGeometry(1,1,1);
+  const mats = [0x1f3d46,0x264a53,0x2e5761,0x365f68].map(c => new THREE.MeshStandardMaterial({color:c, roughness:.85}));
+  for(let i=-7;i<=7;i++) for(let j=-7;j<=7;j++){
+    if(i%3===0 || j%3===0 || j===2 || taken.has(i+","+j)) continue;
+    if(r() < .15) continue;
+    const h = .3 + Math.pow(r(),2.2) * 3.6, m = new THREE.Mesh(box, mats[Math.floor(r()*4)]);
+    m.scale.set(.82, h, .82); m.position.set(i, h/2, j); scene.add(m);
+  }
+
+  const dumps = DUMPS.map(([i,j,k], n) => {
+    const col = new THREE.Color(CATS[k].hex);
+    const mat = new THREE.MeshStandardMaterial({color:col, roughness:.9, emissive:col, emissiveIntensity:.15});
+    const mound = new THREE.Mesh(new THREE.DodecahedronGeometry(.42,0), mat);
+    mound.scale.set(1.1,.45,1); mound.position.set(i,.16,j); scene.add(mound);
+    for(let q=0;q<5;q++){ const b = new THREE.Mesh(box, mat); const s=.08+r()*.12; b.scale.set(s,s,s); b.position.set(i+(r()-.5)*1, s/2, j+(r()-.5)*1); b.rotation.y=r()*3; scene.add(b); }
+    const ring = new THREE.Mesh(new THREE.RingGeometry(.55,.66,48), new THREE.MeshBasicMaterial({color:col, transparent:true, opacity:.8, side:THREE.DoubleSide, depthWrite:false}));
+    ring.rotation.x = -Math.PI/2; ring.position.set(i,.04,j); scene.add(ring);
+    return {i, j, mat, ring, phase:n/6, hit:0};
+  });
+
+  // satellite
+  const sat = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(.6,.6,.9), new THREE.MeshStandardMaterial({color:0xd8dfe2, metalness:.6, roughness:.3}));
+  const pm = new THREE.MeshStandardMaterial({color:0x2f5fa8, metalness:.4, roughness:.35, emissive:0x0b2448});
+  const p1 = new THREE.Mesh(new THREE.BoxGeometry(1.9,.04,.72), pm); p1.position.x = 1.3;
+  const p2 = p1.clone(); p2.position.x = -1.3;
+  const lens = new THREE.Mesh(new THREE.CylinderGeometry(.14,.18,.25,20), new THREE.MeshStandardMaterial({color:0x4cc3b8, emissive:0x4cc3b8, emissiveIntensity:.8}));
+  lens.position.y = -.4;
+  sat.add(body,p1,p2,lens); scene.add(sat);
+  const SAT_H = 10;
+  const beam = new THREE.Mesh(new THREE.ConeGeometry(2, SAT_H, 48, 1, true),
+    new THREE.MeshBasicMaterial({color:0x7fe0d6, transparent:true, opacity:.07, side:THREE.DoubleSide, depthWrite:false, blending:THREE.AdditiveBlending}));
+  scene.add(beam);
+  const foot = new THREE.Mesh(new THREE.RingGeometry(1.8,2,64), new THREE.MeshBasicMaterial({color:0x9af0e7, transparent:true, opacity:.55, side:THREE.DoubleSide, depthWrite:false}));
+  foot.rotation.x = -Math.PI/2; foot.position.y = .05; scene.add(foot);
+
+  // camera orbit + drag
+  let theta = .8, phi = .95, tTheta = theta, tPhi = phi, dragging = false, lx = 0, ly = 0;
+  canvas.addEventListener("pointerdown", e => { dragging = true; lx = e.clientX; ly = e.clientY; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener("pointermove", e => {
+    if(!dragging) return;
+    tTheta += (e.clientX - lx) * .006; tPhi = Math.min(1.25, Math.max(.45, tPhi - (e.clientY - ly) * .004));
+    lx = e.clientX; ly = e.clientY; if(reduced) frame(0);
+  });
+  const end = () => dragging = false;
+  canvas.addEventListener("pointerup", end); canvas.addEventListener("pointercancel", end);
+
+  function resize(){
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    renderer.setSize(w, h, false); camera.aspect = w/h;
+    camera.setViewOffset(w, h, w < 700 ? 0 : -w*.18, 0, w, h); // push scene right of the copy
+    camera.updateProjectionMatrix();
+  }
+  new ResizeObserver(() => { resize(); if(reduced) frame(0); }).observe(canvas);
+
+  let visible = true;
+  new IntersectionObserver(es => { visible = es[0].isIntersecting; }).observe(canvas);
+
+  const t0 = performance.now();
+  function frame(now){
+    const t = reduced ? 6 : (now - t0) / 1000;
+    if(!reduced && !dragging) tTheta += .0012;
+    theta += (tTheta - theta) * .08; phi += (tPhi - phi) * .08;
+    const R = 25;
+    camera.position.set(R*Math.sin(phi)*Math.cos(theta), R*Math.cos(phi), R*Math.sin(phi)*Math.sin(theta));
+    camera.lookAt(0,0,0);
+
+    const sx = 6.5*Math.sin(t*.23), sz = 6*Math.sin(t*.31 + 1);
+    const vx = 6.5*.23*Math.cos(t*.23), vz = 6*.31*Math.cos(t*.31+1);
+    sat.position.set(sx, SAT_H, sz); sat.rotation.y = Math.atan2(vx, vz);
+    beam.position.set(sx, SAT_H/2, sz); foot.position.x = sx; foot.position.z = sz;
+
+    dumps.forEach(d => {
+      const dist = Math.hypot(d.i - sx, d.j - sz);
+      if(dist < 2) d.hit = 1; else d.hit *= .985;
+      const f = (t*.7 + d.phase) % 1;
+      d.ring.scale.setScalar(1 + f*(1.2 + d.hit*1.8));
+      d.ring.material.opacity = (1 - f) * (.35 + d.hit*.65);
+      d.mat.emissiveIntensity = .15 + d.hit*.9;
+    });
+    renderer.render(scene, camera);
+  }
+  resize(); frame(0);
+  if(!reduced){ const loop = now => { if(visible) frame(now); requestAnimationFrame(loop); }; requestAnimationFrame(loop); }
+})();
+</script>
+</body>
+</html>
