@@ -36,9 +36,15 @@ def list_cases(
         FROM dump_cases
     """
     parameters: dict[str, object] = {"limit": limit, "offset": offset}
+    filters = []
+    if current_user.role == "uploader":
+        filters.append("submitted_by = :user_id")
+        parameters["user_id"] = current_user.id
     if status_filter:
-        query += " WHERE status = :status"
+        filters.append("status = :status")
         parameters["status"] = status_filter
+    if filters:
+        query += " WHERE " + " AND ".join(filters)
     query += " ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
     rows = connection.execute(text(query), parameters).mappings()
     return [CaseResponse(**row) for row in rows]
@@ -54,14 +60,16 @@ def create_case(
         row = connection.execute(
             text(
                 """
-                INSERT INTO dump_cases (location, status, category, source)
-                VALUES (ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326)::geography, 'detected', :waste_category, 'manual')
+                INSERT INTO dump_cases (location, status, category, source, submitted_by)
+                VALUES (ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326)::geography,
+                    CASE WHEN :is_uploader THEN 'pending_verification' ELSE 'detected' END,
+                    :waste_category, 'manual', :submitted_by)
                 RETURNING id, case_code, ST_Y(location::geometry) AS latitude,
                           ST_X(location::geometry) AS longitude, status, category AS waste_category,
                           source, created_at
                 """
             ),
-            payload.model_dump(),
+            {**payload.model_dump(), "is_uploader": current_user.role == "uploader", "submitted_by": current_user.id if current_user.role == "uploader" else None},
         ).mappings().one()
         connection.commit()
         return CaseResponse(**row)

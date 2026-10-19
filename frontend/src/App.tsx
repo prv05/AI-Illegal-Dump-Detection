@@ -5,7 +5,7 @@ import HeroScene from "./HeroScene";
 type Phase = "detected" | "verified" | "reported" | "rejected";
 type Case = { id: number; case_code: string; latitude: number; longitude: number; status: string; waste_category: string; source: string; created_at: string; phase?: Phase; confidence?: number; area?: number; notes?: string; severity?: string; photo?: string; ticket?: string };
 type Category = { name: string; color: string };
-const apiBase = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+const apiBase = import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8000`;
 const categories: Record<string, Category> = { construction: { name: "Construction debris", color: "#D9A441" }, biomedical: { name: "Biomedical", color: "#E0457B" }, chemical: { name: "Chemical / industrial", color: "#9B7BFF" }, household: { name: "Household mixed", color: "#3FB8AF" }, ewaste: { name: "E-waste", color: "#5A9BF6" }, plastic: { name: "Plastic", color: "#B5CF4A" }, unknown: { name: "Unknown", color: "#91A3A8" } };
 const demoCandidates: Case[] = [
   { id: -1, case_code: "DEMO-101", latitude: 12.982, longitude: 77.548, status: "suspected", waste_category: "construction", source: "demo scan", created_at: new Date().toISOString(), phase: "detected", confidence: .93, area: 420 },

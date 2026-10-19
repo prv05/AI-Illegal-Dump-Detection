@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS dump_cases (
     risk_score NUMERIC(5, 2) CHECK (risk_score IS NULL OR risk_score BETWEEN 0 AND 100),
     status TEXT NOT NULL DEFAULT 'detected' CHECK (status IN ('detected', 'pending_verification', 'verified', 'rejected', 'needs_more_evidence', 'cleanup_assigned', 'cleaned', 'closed', 'duplicate')),
     assigned_to BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    submitted_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
     reported_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -127,12 +128,37 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
     last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS notifications (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    notification_type TEXT NOT NULL DEFAULT 'system',
+    related_case_id BIGINT REFERENCES dump_cases(id) ON DELETE SET NULL,
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    read_at TIMESTAMPTZ
+);
+
 DROP TRIGGER IF EXISTS trg_users_updated_at ON users;
 CREATE TRIGGER trg_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 DROP TRIGGER IF EXISTS trg_dump_cases_updated_at ON dump_cases;
 CREATE TRIGGER trg_dump_cases_updated_at BEFORE UPDATE ON dump_cases FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 DROP TRIGGER IF EXISTS trg_cleanup_records_updated_at ON cleanup_records;
 CREATE TRIGGER trg_cleanup_records_updated_at BEFORE UPDATE ON cleanup_records FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE OR REPLACE FUNCTION notify_case_status_change() RETURNS trigger AS $$
+BEGIN
+    IF NEW.submitted_by IS NOT NULL AND OLD.status IS DISTINCT FROM NEW.status THEN
+        INSERT INTO notifications (user_id, title, message, notification_type, related_case_id)
+        VALUES (NEW.submitted_by, 'Report status updated', 'Your report ' || NEW.case_code || ' is now ' || replace(NEW.status, '_', ' ') || '.', 'case_update', NEW.id);
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_notify_case_status_change ON dump_cases;
+CREATE TRIGGER trg_notify_case_status_change AFTER UPDATE OF status ON dump_cases FOR EACH ROW EXECUTE FUNCTION notify_case_status_change();
 
 CREATE INDEX IF NOT EXISTS idx_image_assets_uploaded_by ON image_assets (uploaded_by);
 CREATE INDEX IF NOT EXISTS idx_image_assets_source_type ON image_assets (source_type);
@@ -144,6 +170,7 @@ CREATE INDEX IF NOT EXISTS idx_dump_cases_location ON dump_cases USING GIST (loc
 CREATE INDEX IF NOT EXISTS idx_dump_cases_status ON dump_cases (status);
 CREATE INDEX IF NOT EXISTS idx_dump_cases_severity ON dump_cases (severity);
 CREATE INDEX IF NOT EXISTS idx_dump_cases_assigned_to ON dump_cases (assigned_to);
+CREATE INDEX IF NOT EXISTS idx_dump_cases_submitted_by ON dump_cases (submitted_by);
 CREATE INDEX IF NOT EXISTS idx_dump_cases_created_at ON dump_cases (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_detections_run_id ON detections (detection_run_id);
 CREATE INDEX IF NOT EXISTS idx_detections_case_id ON detections (dump_case_id);
@@ -156,3 +183,5 @@ CREATE INDEX IF NOT EXISTS idx_cleanup_records_case_id ON cleanup_records (dump_
 CREATE INDEX IF NOT EXISTS idx_cleanup_records_status ON cleanup_records (status);
 CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_id ON auth_sessions (user_id);
 CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires_at ON auth_sessions (expires_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications (user_id, is_read);

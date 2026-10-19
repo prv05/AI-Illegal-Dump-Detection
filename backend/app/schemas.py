@@ -37,6 +37,20 @@ class LoginRequest(BaseModel):
         return value.strip().lower()
 
 
+class PasswordChange(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+    new_password_confirmation: str = Field(min_length=8, max_length=128)
+
+    @model_validator(mode="after")
+    def validate_password(self):
+        if self.new_password != self.new_password_confirmation:
+            raise ValueError("Passwords do not match")
+        if not any(character.isupper() for character in self.new_password) or not any(character.isdigit() for character in self.new_password):
+            raise ValueError("Password must include an uppercase letter and a number")
+        return self
+
+
 class UserResponse(BaseModel):
     id: int
     name: str
@@ -71,6 +85,50 @@ class CaseResponse(BaseModel):
     waste_category: str
     source: str
     created_at: datetime
+
+
+class DashboardReport(BaseModel):
+    id: int
+    case_code: str
+    latitude: float
+    longitude: float
+    status: str
+    waste_category: str
+    source: str
+    created_at: datetime
+    evidence_count: int
+    evidence: list["EvidenceItem"] = Field(default_factory=list)
+
+
+class EvidenceItem(BaseModel):
+    id: int
+    original_filename: str
+    mime_type: str
+    url: str
+
+
+class UploaderDashboard(BaseModel):
+    counts: dict[str, int]
+    recent_reports: list[DashboardReport]
+
+
+class ReportCreated(BaseModel):
+    id: int
+    case_code: str
+    status: str
+    photo_count: int
+    created_at: datetime
+
+
+class NotificationResponse(BaseModel):
+    id: int
+    title: str
+    message: str
+    notification_type: str
+    related_case_id: int | None
+    is_read: bool
+    created_at: datetime
+    read_at: datetime | None
 
 
 class HealthResponse(BaseModel):

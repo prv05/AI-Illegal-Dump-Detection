@@ -4,9 +4,9 @@ Phase 1 provides a local foundation for tracking suspected illegal-waste locatio
 
 ## Phase 1 scope
 
-Implemented: health reporting, cookie-based Argon2 authentication, protected case APIs, recent case listing, coordinate validation, detected-case creation, readable case codes such as `DMP-000001`, PostGIS point storage, and a live dashboard connected to the API.
+Implemented: health reporting, cookie-based Argon2 authentication, protected case APIs, uploader-owned report dashboard, 3–5 photo report intake with GPS checks, private image metadata/evidence links, coordinate validation, detected-case creation, readable case codes such as `DMP-000001`, PostGIS point storage, and a live dashboard connected to the API.
 
-Not implemented yet: AI inference, satellite imagery ingestion, Google Maps or Street View, S3 image uploads, password reset, municipal inspection APIs, notifications, and cleanup workflow APIs.
+Not implemented yet: AI inference, satellite imagery ingestion, Google Maps or Street View preview, S3 image uploads (local private storage is used until S3 is configured), password reset, municipal inspection APIs, notifications, and cleanup workflow APIs.
 
 ## Prerequisites
 
@@ -24,7 +24,7 @@ Run the native PostgreSQL, backend, and frontend setup below from this project r
 - Health: http://localhost:8000/api/v1/health
 - Cases: http://localhost:8000/api/v1/cases
 
-Authentication routes: `POST /api/v1/auth/signup`, `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, and `GET /api/v1/auth/me`. Sessions use an HttpOnly, SameSite cookie containing a random token whose SHA-256 hash is stored in `auth_sessions`; passwords use Argon2id hashes and are never returned.
+Authentication routes: `POST /api/v1/auth/signup`, `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, and `GET /api/v1/auth/me`. Uploader routes include `GET /api/v1/my/dashboard`, `POST /api/v1/my/reports`, and `GET /api/v1/my/reports/{case_id}`. Sessions use an HttpOnly, SameSite cookie containing a random token whose SHA-256 hash is stored in `auth_sessions`; passwords use Argon2id hashes and are never returned.
 
 ## API smoke tests
 
@@ -113,6 +113,14 @@ python -c "from pathlib import Path; import psycopg; from dotenv import dotenv_v
 ```
 
 The migration creates only `auth_sessions`; it does not delete or recreate existing tables.
+
+Apply the uploader ownership migration to an existing database without resetting data:
+
+```powershell
+psql $env:DATABASE_URL -f database\migrations\003_uploader_reports.sql
+```
+
+The uploader flow stores uploaded files under the private `private_uploads` directory until an S3 provider is configured. The directory is ignored by Git and is not served publicly.
 
 ## Database lifecycle
 

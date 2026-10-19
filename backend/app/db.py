@@ -1,7 +1,9 @@
 from collections.abc import Generator
 
+from fastapi import HTTPException, status
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection, Engine
+from sqlalchemy.exc import SQLAlchemyError
 
 from .config import get_settings
 
@@ -9,8 +11,14 @@ engine: Engine = create_engine(get_settings().sqlalchemy_database_url, pool_pre_
 
 
 def get_connection() -> Generator[Connection, None, None]:
-    with engine.connect() as connection:
-        yield connection
+    try:
+        with engine.connect() as connection:
+            yield connection
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database is temporarily unavailable",
+        ) from exc
 
 
 def check_database() -> bool:

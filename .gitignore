@@ -9,6 +9,7 @@ __pycache__/
 .venv/
 venv/
 uploads/
+private_uploads/
 datasets/
 models/
 *.pt

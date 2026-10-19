@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./RootApp";
 import "./styles.css";
 import "./theme.css";
+import "./uploader.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode><App /></React.StrictMode>,
